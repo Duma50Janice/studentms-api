@@ -1,0 +1,19 @@
+{
+    "name": "andy/studentapi",
+    "description": "simple student management api",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "andrew21-mch",
+            "email": "nfonandrew73@gmail.com"
+        }
+    ],
+    "require": {
+        "vlucas/phpdotenv": "*"
+    }
+}
