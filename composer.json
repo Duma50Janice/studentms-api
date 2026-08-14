@@ -14,6 +14,6 @@
         }
     ],
     "require": {
-        "vlucas/phpdotenv": "*"
+        "vlucas/phpdotenv": "^5.6"
     }
 }
