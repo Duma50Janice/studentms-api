@@ -1,4 +1,13 @@
 <?php 
+// Report all PHP errors
+error_reporting(E_ALL);
+
+// Force PHP to display errors on the screen
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+
+
+use App\Controllers\StudentController;
 
 
 // capture the request sent
@@ -33,7 +42,8 @@ try {
     http_response_code(200);
     header("Content-Type:application/json");
     // var_dump($e);
-    echo json_encode(['success' => $db]);
+ echo json_encode(['success' => $db]);
+
 }catch(\Throwable  $e) {
     http_response_code(500);
     header("Content-Type:application/json");
@@ -43,5 +53,39 @@ try {
 
 
 
+$studentController = new StudentController($db);
+
+
+// var_dump($studentController->index());
+$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$method = $_SERVER['REQUEST_METHOD'];
+
+
+$basePath = '/studentapi/public';
+
+
+
+if(str_starts_with($path, $basePath)){
+    $path = substr($path,strlen($basePath));
+}
+
+
+if($path === ''){
+    $path = '/';
+}
+
+
+// echo $path;
+
+// if($path = "students"){
+//     echo json_encode(["success" => $path, 'method' => $method]);
+// }
+
+
+if($path === '/students' && $method == 'GET'){
+    $studentController->index();
+}elseif($path === "/students" && $method === "POST"){
+    $studentController->store();
+}
 
 

@@ -1,23 +1,156 @@
-<?php 
+<?php
 
 namespace App\Controllers;
 use App\Models\Student;
 use PDO;
 
+use App\Models\Student;
+use Exception;
+use PDO;
 
-class StudentController {
-    private $studentModel;
+/**
+ * StudentController
+ * ------------------
+ * A "Controller" is the traffic cop. It:
+ *   1. Receives the incoming request (already routed to it)
+ *   2. Reads input (query params, JSON body)
+ *   3. Talks to the Model to do the actual database work
+ *   4. Sends back a JSON response with the correct HTTP status code
+ *
+ * A Controller should NEVER contain raw SQL. That belongs in the Model.
+ */
+class StudentController
+{
+    private Student $studentModel;
 
-    public function __construct(PDO $db){
+    public function __construct(PDO $db)
+    {
         $this->studentModel = new Student($db);
+    }
 
-    }
-    public function index(){
+    /**
+     * index()
+     * Handles: GET /students        -> list everyone
+     * Handles: GET /students?id=1   -> get one student
+     */
+    public function index(): void
+    {
+        if (isset($_GET['id'])) { // /student?id=12
+            $this->show((int) $_GET['id']);
+            return;
+        }
+
         $students = $this->studentModel->getAll();
-        echo json_encode(["success" => true, "data" => $students]);
-        // return view("",compact(""));
-        // echo json_encode($students);
+        $this->respond(200, $students);
     }
+
+    /**
+     * show()
+     * Handles: GET /students?id=1
+     */
+    public function show(int $id): void
+    {
+        $student = $this->studentModel->find($id);
+
+        if (!$student) {
+            $this->respond(404, ['error' => 'Student not found']);
+            return;
+        }
+
+        $this->respond(200, $student);
+    }
+
+    /**
+     * store()
+     * Handles: POST /students
+     * Reads a JSON body like:
+     * { "first_name": "Jane", "last_name": "Doe", "email": "jane@x.com", "courses": "CS" }
+     */
+    public function store()
+    {
+        $data = $this->getJsonInput();
+
+        $errors = $this->validate($data);
+        if (!empty($errors)) {
+            $this->respond(400, ['errors' => $errors]);
+            return;
+        }
+
+        if ($this->studentModel->emailExists($data['email'])) {
+            $this->respond(400, ['errors' => ['email' => 'Email already in use']]);
+            return;
+        }
+
+        try {
+           $id =  $this->studentModel->create($data);
+           
+            $student = $this->studentModel->find($id);
+
+            // 201 Created = "your POST worked and a new resource now exists"
+            $this->respond(201, $student);
+        }catch(Exception $e){
+            $this->respond(500, $e->getMessage());
+        }
+    }
+
+    /**
+     * ---------- Helper methods below ----------
+     */
+
+    /**
+     * getJsonInput()
+     * Reads the raw request body and decodes it from JSON into a PHP array.
+     * php://input is a special stream that holds the raw body of the request.
+     */
+    private function getJsonInput(): array
+    {
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * validate()
+     * Very simple manual validation. In a real framework (Laravel) this
+     * would be done with a "Form Request" class, but doing it by hand
+     * once helps interns understand what's happening under the hood.
+     */
+    private function validate(array $data): array
+    {
+        $errors = [];
+
+        if (empty($data['first_name'])) {
+            $errors['first_name'] = 'First name is required';
+        }
+        if (empty($data['last_name'])) {
+            $errors['last_name'] = 'Last name is required';
+        }
+        if (empty($data['email'])) {
+            $errors['email'] = 'Email is required';
+        } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            $errors['email'] = 'Email is not valid';
+        }
+        if (empty($data['courses'])) {
+            $errors['courses'] = 'courses is required';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * respond()
+     * Sends a JSON response with the correct HTTP status code.
+     * Centralizing this in one place keeps every endpoint consistent.
+     */
+    private function respond(int $statusCode, mixed $payload): void
+    {
+        http_response_code($statusCode);
+        header('Content-Type: application/json');
+        echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+
     public function getById($id){
         $student = $this->studentModel->getById($id);
         if(!$student){
@@ -28,48 +161,14 @@ class StudentController {
         echo json_encode(["success" => true, "data" => $student]);
     }
 
-        public function create($data){
-            $first_name = $data['first_name'];
-            $last_name = $data['last_name'];
-            $email = $data['email'];
-            $course = $data['course'];
-
-            if($this->studentModel->create($first_name, $last_name, $email, $course)){
-                http_response_code(201);
-                echo json_encode(["success" => true, "message" => "Student created successfully"]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["success" => false, "message" => "Failed to create student"]);
-            }
+      
+    public function deleteAll(){
+        if($this->studentModel->deleteAll()){
+            echo json_encode(["success" => true, "message" => "All students deleted successfully"]);
+        } else {
+            http_response_code(500);
+            echo json_encode(["success" => false, "message" => "Failed to delete all students"]);
         }
-
-        public function update($id, $data){
-            $first_name = $data['first_name'];
-            $last_name = $data['last_name'];
-            $email = $data['email'];
-            $course = $data['course'];
-
-            if($this->studentModel->update($id, $first_name, $last_name, $email, $course)){
-                echo json_encode(["success" => true, "message" => "Student updated successfully"]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["success" => false, "message" => "Failed to update student"]);
-            }
-        }
-        public function delete($id){
-            if($this->studentModel->delete($id)){
-                echo json_encode(["success" => true, "message" => "Student deleted successfully"]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["success" => false, "message" => "Failed to delete student"]);
-            }
-        }
-        public function deleteAll(){
-            if($this->studentModel->deleteAll()){
-                echo json_encode(["success" => true, "message" => "All students deleted successfully"]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["success" => false, "message" => "Failed to delete all students"]);
-            }
-        }
+    }
 }
+
